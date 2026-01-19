@@ -1,3 +1,4 @@
+[![pages-build-deployment](https://github.com/Reithan/CivitAI_Scout/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/Reithan/CivitAI_Scout/actions/workflows/pages/pages-build-deployment)
 # CivitAI Scout
 Search and sort Civit.ai models by multiple metrics.
 
