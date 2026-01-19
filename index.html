@@ -189,35 +189,39 @@
             const [availableBaseModels, setAvailableBaseModels] = useState(defaultBaseModels);
             const [blurNSFW, setBlurNSFW] = useState(true);
 
+            const sortResults = (rawResults, sortMethod) => {
+                if (!(rawResults?.length > 0)) return rawResults;
+
+                return [...rawResults].sort((a, b) => {
+                    switch (sortMethod) {
+                        case 'downloads':
+                            return b.downloadCount - a.downloadCount;
+                        case 'version-downloads':
+                            return b.versionDownloadCount - a.versionDownloadCount;
+                        case 'model-rating':
+                            return b.modelRating - a.modelRating;
+                        case 'version-rating':
+                            return b.versionRating - a.versionRating;
+                        case 'comments':
+                            return b.commentCount - a.commentCount;
+                        case 'buzz':
+                            return b.buzz - a.buzz;
+                        case 'score':
+                            const scoreA = calculateScore(a.thumbsUp, a.thumbsDown, a.downloadCount, a.buzz);
+                            const scoreB = calculateScore(b.thumbsUp, b.thumbsDown, b.downloadCount, b.buzz);
+                            return scoreB - scoreA;
+                        case 'newest':
+                            return new Date(b.createdAt) - new Date(a.createdAt);
+                        default:
+                            return 0;
+                    }
+                });
+            };
+        
             useEffect(() => {
-                if (results?.length > 0) {
-                    const sorted = [...results].sort((a, b) => {
-                        switch (sortBy) {
-                            case 'downloads':
-                                return b.downloadCount - a.downloadCount;
-                            case 'version-downloads':
-                                return b.versionDownloadCount - a.versionDownloadCount;
-                            case 'model-rating':
-                                return b.modelRating - a.modelRating;
-                            case 'version-rating':
-                                return b.versionRating - a.versionRating;
-                            case 'comments':
-                                return b.commentCount - a.commentCount;
-                            case 'buzz':
-                                return b.buzz - a.buzz;
-                            case 'score':
-                                const scoreA = calculateScore(a.thumbsUp, a.thumbsDown, a.downloadCount, a.buzz);
-                                const scoreB = calculateScore(b.thumbsUp, b.thumbsDown, b.downloadCount, b.buzz);
-                                return scoreB - scoreA;
-                            case 'newest':
-                                return new Date(b.createdAt) - new Date(a.createdAt);
-                            default:
-                                return 0;
-                        }
-                    });
-                    setResults(sorted);
-                }
-            }, [results, sortBy]);
+                setResults(sortResults(results, sortBy));
+
+            }, [sortBy]);
 
             const fetchCheckpoints = useCallback(async () => {
                 setLoading(true);
@@ -321,14 +325,14 @@
                     setAvailableTypes(newTypes);
                     setAvailableBaseModels(newBaseModels);
 
-                    setResults(flattened);
+                    setResults(sortResults(flattened, sortBy));
                 } catch (err) {
                     setError(err.message || 'Failed to fetch models');
                     setResults([]);
                 } finally {
                     setLoading(false);
                 }
-            }, [period, sortBy, modelTypes, baseModels]);
+            }, [period, modelTypes, baseModels, sortBy]);
 
             const formatDate = (dateString) => {
                 return new Date(dateString).toLocaleDateString('en-US', {
