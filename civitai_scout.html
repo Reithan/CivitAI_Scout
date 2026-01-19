@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivitAI Scout</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        // Suppress non-critical warnings
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            if (args[0]?.includes?.('should not be used in production') || 
+                args[0]?.includes?.('in-browser Babel transformer')) {
+                return;
+            }
+            originalWarn.apply(console, args);
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useCallback } = React;
+
+        // Inline SVG Icons
+        const Calendar = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>;
+        const Download = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+        const Search = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
+        const Heart = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+        const MessageSquare = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+        const Loader = () => <svg className="inline animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="7.34" y2="7.34"/><line x1="16.66" y1="16.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="7.34" y2="16.66"/><line x1="16.66" y1="7.34" x2="19.78" y2="4.22"/></svg>;
+        const ExternalLink = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
+        const Zap = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{color: '#f97316'}}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+
+        // Helper functions
+        const isVideoUrl = (url) => {
+            if (!url) return false;
+            const videoExtensions = ['.mp4', '.webm', '.mov', '.avi'];
+            return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+        };
+
+        const stripHtml = (html) => {
+            if (!html) return '';
+            const tmp = document.createElement('DIV');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        };
+
+        // Calculate composite score from multiple signals
+        const calculateScore = (thumbsUp, thumbsDown, downloads, tips) => {
+            if (downloads === 0 && thumbsUp === 0) {
+                return Math.pow(Math.log10(tips + 1), 2);
+            }
+
+            // Signal 1: Downloads (base popularity)
+            const dlSignal = Math.log10(downloads + 1);
+
+            // Signal 2: Tips (prestige, high multiplier)
+            const tipsSignal = Math.log10(tips + 1) * 5;  // Linear, not squared; strong multiplier
+
+            // Signal 3: Thumbs (engagement quality, but LESS important at high downloads)
+            const downloadCount = Math.max(downloads, 10);
+            const engagementBaseline = Math.max(0.05, 0.2 / Math.sqrt(downloadCount / 100));
+            const expectedThumbs = downloadCount * engagementBaseline;
+            const thumbsRatioSignal = thumbsUp - expectedThumbs;
+            const netThumbs = Math.max(thumbsRatioSignal - thumbsDown * 10, 0);
+
+            // Weight thumbs LESS as downloads increase (inverse)
+            const thumbsWeight = Math.min(1, 100 / downloadCount);  // Caps at 1, decreases with downloads
+            const thumbsSignal = netThumbs * thumbsWeight;
+
+            return dlSignal + thumbsSignal + tipsSignal;
+        };
+
+
+        const formatNumber = (num) => {
+            if (!num) return '0';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        };
+
+        const formatDate = (dateString) => {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+        };
+
+        // Multi-select dropdown component (moved outside of CivitaiSearch to maintain state)
+        const MultiSelect = ({ options, selected, onChange, placeholder, displayNames }) => {
+            const [open, setOpen] = useState(false);
+            const dropdownRef = React.useRef(null);
+
+            React.useEffect(() => {
+                if (!open) return;
+
+                const handleClickOutside = (event) => {
+                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                        setOpen(false);
+                    }
+                };
+
+                // Use capture phase to intercept clicks before React synthetic events
+                document.addEventListener('click', handleClickOutside, { capture: true });
+                return () => document.removeEventListener('click', handleClickOutside, { capture: true });
+            }, [open]);
+
+            return (
+                <div className="relative" ref={dropdownRef}>
+                    <button
+                        onClick={() => setOpen(!open)}
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        {selected.length === 0 ? placeholder : `${selected.length} selected`}
+                    </button>
+                    {open && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                            {options.map(opt => (
+                                <label 
+                                    key={opt} 
+                                    className="flex items-center px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selected.includes(opt)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                        }}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                onChange([...selected, opt]);
+                                            } else {
+                                                onChange(selected.filter(s => s !== opt));
+                                            }
+                                            e.stopPropagation();
+                                        }}
+                                        className="mr-2"
+                                    />
+                                    {displayNames && displayNames[opt] ? displayNames[opt] : opt}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        function CivitaiSearch() {
+            const defaultTypes = ['Checkpoint', 'LORA', 'TextualInversion', 'LoCon', 'DoRA', 'Hypernetwork', 'Controlnet', 'Upscaler', 'MotionModule', 'VAE', 'Poses', 'Wildcards', 'Workflows', 'Detection', 'AestheticGradient', 'Other'];
+            const typeDisplayNames = {
+                'Checkpoint': 'Checkpoint',
+                'TextualInversion': 'Embedding',
+                'Hypernetwork': 'Hypernetwork',
+                'AestheticGradient': 'Aesthetic Gradient',
+                'LORA': 'LoRA',
+                'LoCon': 'LyCORIS',
+                'DoRA': 'DoRA',
+                'Controlnet': 'Controlnet',
+                'Upscaler': 'Upscaler',
+                'MotionModule': 'Motion',
+                'VAE': 'VAE',
+                'Poses': 'Poses',
+                'Wildcards': 'Wildcards',
+                'Workflows': 'Workflows',
+                'Detection': 'Detection',
+                'Other': 'Other'
+            };
+            
+            const defaultBaseModels = ['Aura Flow', 'Chroma', 'CogVideoX', 'Flux .1 D', 'Flux .1 Kontext', 'Flux .1 Krea', 'Flux .1 S', 'Flux .2 D', 'HiDream', 'Hunyuan 1', 'Hunyuan Video', 'Illustrious', 'Kolors', 'LTXV', 'Lumina', 'Mochi', 'NoobAI', 'PixArt α', 'PixArt Σ', 'Pony v7', 'Pony', 'Qwen', 'SD 1.4', 'SD 1.5 Hype', 'SD 1.5 LCM', 'SD 1.5', 'SD 2.0', 'SD 2.1', 'SDXL 1.0', 'SDXL Hyper', 'SDXL Lightning', 'Wan Video 1.3B t2v', 'Wan Video 14B t2v', 'Wan Video 2.2 I2V-A14B', 'Wan Video 2.2 T2V-A14B', 'Wan Video 2.5 I2V', 'Wan Video 2.5 T2V', 'Z Image Turbo', 'Other'];
+            
+            const [results, setResults] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [period, setPeriod] = useState('Week');
+            const [sortBy, setSortBy] = useState('score');
+            const [searched, setSearched] = useState(false);
+            const [modelTypes, setModelTypes] = useState(['Checkpoint']);
+            const [baseModels, setBaseModels] = useState([]);
+            const [availableTypes, setAvailableTypes] = useState(defaultTypes);
+            const [availableBaseModels, setAvailableBaseModels] = useState(defaultBaseModels);
+            const [blurNSFW, setBlurNSFW] = useState(true);
+
+            const fetchCheckpoints = useCallback(async () => {
+                setLoading(true);
+                setError('');
+                setSearched(true);
+
+                try {
+                    const params = new URLSearchParams({
+                        sort: 'Newest',
+                        period: period,
+                        limit: 100,
+                        nsfw: true
+                    });
+                    
+                    // Add all selected types to API query
+                    if (modelTypes.length > 0) {
+                        modelTypes.forEach(type => params.append('types', type));
+                    }
+
+                    // Add all selected base models to API query
+                    if (baseModels.length > 0) {
+                        baseModels.forEach(base => params.append('baseModels', base));
+                    }
+
+                    const response = await fetch(
+                        `https://civitai.com/api/v1/models?${params}`
+                    );
+                    
+                    if (!response.ok) throw new Error('API request failed');
+                    
+                    const data = await response.json();
+                    
+                    if (!data.items) {
+                        setResults([]);
+                        return;
+                    }
+
+                    // Flatten and enrich data
+                    const flattened = [];
+                    const typeSet = new Set(availableTypes);
+                    const baseModelSet = new Set(availableBaseModels);
+                    const seenModelIds = new Set(); // Track seen models to avoid duplicates
+
+                    data.items.forEach(model => {
+                        // Skip if we've already added this model
+                        if (seenModelIds.has(model.id)) {
+                            return;
+                        }
+                        
+                        typeSet.add(model.type);
+                        
+                        if (model.modelVersions && model.modelVersions.length > 0) {
+                            // Find first version with images for thumbnail
+                            let thumbnail = null;
+                            let thumbnail_nsfw = false;
+                            let selectedVersion = model.modelVersions[0];
+
+                            for (let version of model.modelVersions) {
+                                if (version.images && version.images.length > 0) {
+                                    thumbnail = version.images[0].url;
+                                    thumbnail_nsfw = version.images[0].nsfwLevel >= 8;
+                                    selectedVersion = version;
+                                    break;
+                                }
+                            }
+                            
+                            if (selectedVersion.baseModel) baseModelSet.add(selectedVersion.baseModel);
+                            
+                            flattened.push({
+                                id: model.id,
+                                versionId: selectedVersion.id,
+                                name: model.name,
+                                creator: model.creator?.username || 'Unknown',
+                                description: selectedVersion.description || model.description || '',
+                                stats: model.stats || {},
+                                downloadCount: model.stats?.downloadCount || 0,
+                                versionDownloadCount: selectedVersion.stats?.downloadCount || 0,
+                                commentCount: model.stats?.commentCount || 0,
+                                thumbsUp: model.stats?.thumbsUpCount || 0,
+                                thumbsDown: model.stats?.thumbsDownCount || 0,
+                                modelRating: (model.stats?.thumbsUpCount || 0) - (model.stats?.thumbsDownCount || 0),
+                                versionRating: (selectedVersion.stats?.thumbsUpCount || 0) - (selectedVersion.stats?.thumbsDownCount || 0),
+                                thumbs: (model.stats?.thumbsUpCount || 0) - (model.stats?.thumbsDownCount || 0),
+                                buzz: model.stats?.tippedAmountCount || 0,
+                                type: model.type,
+                                createdAt: selectedVersion.publishedAt || model.createdAt,
+                                baseModel: selectedVersion.baseModel || 'Unknown',
+                                url: `https://civitai.com/models/${model.id}`,
+                                thumbnail: thumbnail,
+                                nsfw: thumbnail_nsfw || false
+                            });
+                            
+                            // Mark this model as seen
+                            seenModelIds.add(model.id);
+                        }
+                    });
+
+                    // Update available options (merge with defaults to keep accumulating)
+                    const newTypes = Array.from(typeSet).sort();
+                    const newBaseModels = Array.from(baseModelSet).sort();
+                    setAvailableTypes(newTypes);
+                    setAvailableBaseModels(newBaseModels);
+
+                    // Sort client-side
+                    const sorted = [...flattened].sort((a, b) => {
+                        switch (sortBy) {
+                            case 'downloads':
+                                return b.downloadCount - a.downloadCount;
+                            case 'version-downloads':
+                                return b.versionDownloadCount - a.versionDownloadCount;
+                            case 'model-rating':
+                                return b.modelRating - a.modelRating;
+                            case 'version-rating':
+                                return b.versionRating - a.versionRating;
+                            case 'comments':
+                                return b.commentCount - a.commentCount;
+                            case 'buzz':
+                                return b.buzz - a.buzz;
+                            case 'score':
+                                const scoreA = calculateScore(a.thumbsUp, a.thumbsDown, a.downloadCount, a.buzz);
+                                const scoreB = calculateScore(b.thumbsUp, b.thumbsDown, b.downloadCount, b.buzz);
+                                return scoreB - scoreA;
+                            case 'newest':
+                                return new Date(b.createdAt) - new Date(a.createdAt);
+                            default:
+                                return 0;
+                        }
+                    });
+
+                    setResults(sorted);
+                } catch (err) {
+                    setError(err.message || 'Failed to fetch models');
+                    setResults([]);
+                } finally {
+                    setLoading(false);
+                }
+            }, [period, sortBy, modelTypes, baseModels]);
+
+            const formatDate = (dateString) => {
+                return new Date(dateString).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                });
+            };
+
+            const formatNumber = (num) => {
+                if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+                if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+                return num.toString();
+            };
+
+            const stripHtml = (html) => {
+                if (!html) return '';
+                return html.replace(/<[^>]*>/g, '').trim().substring(0, 120) + '...';
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+                    {/* Sticky Header & Controls */}
+                    <div className="sticky top-0 z-50 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 shadow-sm">
+                        <div className="max-w-7xl mx-auto p-6">
+                            {/* Header */}
+                            <div className="mb-6">
+                                <h1 className="text-4xl font-bold text-slate-900 mb-2">CivitAI Scout</h1>
+                                <p className="text-slate-600">Discover models released recently, sorted by engagement</p>
+                            </div>
+
+                            {/* Controls */}
+                            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                                {/* Period Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <Calendar /> Time Period
+                                    </label>
+                                    <select
+                                        value={period}
+                                        onChange={(e) => setPeriod(e.target.value)}
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    >
+                                        <option value="Day">Past Day</option>
+                                        <option value="Week">Past Week</option>
+                                        <option value="Month">Past Month</option>
+                                        <option value="Year">Past Year</option>
+                                        <option value="AllTime">All Time</option>
+                                    </select>
+                                </div>
+
+                                {/* Model Type Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+                                    <MultiSelect 
+                                        key="model-types"
+                                        options={availableTypes}
+                                        selected={modelTypes}
+                                        onChange={setModelTypes}
+                                        placeholder="All Types"
+                                        displayNames={typeDisplayNames}
+                                    />
+                                </div>
+
+                                {/* Base Model Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Base Model</label>
+                                    <MultiSelect 
+                                        key="base-models"
+                                        options={availableBaseModels}
+                                        selected={baseModels}
+                                        onChange={setBaseModels}
+                                        placeholder="All Models"
+                                    />
+                                </div>
+
+                                {/* Sort Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <Download /> Sort By
+                                    </label>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    >
+                                        <option value="score">Composite Score</option>
+                                        <option value="version-downloads">Version Downloads</option>
+                                        <option value="downloads">Model Downloads</option>
+                                        <option value="version-rating">Version Rating</option>
+                                        <option value="model-rating">Model Rating</option>
+                                        <option value="buzz">Buzz (Tips)</option>
+                                        <option value="comments">Comments</option>
+                                        <option value="newest">Newest</option>
+                                    </select>
+                                </div>
+
+                                {/* NSFW Blur Toggle */}
+                                <div className="flex items-end">
+                                    <label className="flex items-center gap-2 cursor-pointer h-10 px-3 py-2 text-sm border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={blurNSFW}
+                                            onChange={(e) => setBlurNSFW(e.target.checked)}
+                                            className="w-4 h-4"
+                                        />
+                                        <span className="font-medium text-slate-700">Blur NSFW</span>
+                                    </label>
+                                </div>
+
+                                {/* Search Button */}
+                                <div className="col-span-2 md:col-span-2 lg:col-span-1 flex items-end">
+                                    <button
+                                        onClick={fetchCheckpoints}
+                                        disabled={loading}
+                                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium text-sm rounded-md transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader />
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search />
+                                                Search
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {error && (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                                    {error}
+                                </div>
+                            )}
+                        </div>
+                        </div>
+                    </div>
+
+                    {/* Scrollable Results Section */}
+                    <div className="p-6">
+                        <div className="max-w-7xl mx-auto">
+                            {/* Results */}
+                            {searched && (
+                                <div>
+                                    {loading ? (
+                                        <div className="p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200">
+                                        <div className="flex justify-center mb-4">
+                                            <Loader />
+                                        </div>
+                                        Loading models...
+                                    </div>
+                                ) : results.length === 0 ? (
+                                    <div className="p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200">
+                                        No models found for this time period.
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <div className="text-sm text-slate-600 mb-4">
+                                            Found {results.length} result{results.length !== 1 ? 's' : ''}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                            {results.map((model) => (
+                                                <a
+                                                    key={`${model.id}-${model.versionId}`}
+                                                    href={model.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200"
+                                                >
+                                                    {/* Thumbnail */}
+                                                    <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                                                        {model.thumbnail ? (
+                                                            isVideoUrl(model.thumbnail) ? (
+                                                                <video
+                                                                    src={model.thumbnail}
+                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                    autoPlay
+                                                                    muted
+                                                                    loop
+                                                                    style={{
+                                                                        filter: blurNSFW && model.nsfw ? 'blur(20px)' : 'none'
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <img
+                                                                    src={model.thumbnail}
+                                                                    alt={model.name}
+                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                    style={{
+                                                                        filter: blurNSFW && model.nsfw ? 'blur(20px)' : 'none'
+                                                                    }}
+                                                                />
+                                                            )
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                                <div className="text-center text-sm">No image</div>
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                                            {model.type}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="p-4">
+                                                        <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-1 group-hover:text-blue-600">
+                                                            {model.name}
+                                                        </h3>
+                                                        
+                                                        <p className="text-xs text-slate-500 mb-3">{model.creator}</p>
+
+                                                        <p className="text-xs text-slate-600 line-clamp-2 mb-3">
+                                                            {stripHtml(model.description)}
+                                                        </p>
+
+                                                        {/* Base Model Badge */}
+                                                        <div className="mb-3">
+                                                            <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded">
+                                                                {model.baseModel}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Stats */}
+                                                        <div className="grid grid-cols-4 gap-2 text-xs">
+                                                            <div className="text-center">
+                                                                <Download />
+                                                                <div className="font-semibold text-slate-900">{formatNumber(sortBy.includes('version') ? model.versionDownloadCount : model.downloadCount)}</div>
+                                                                <div className="text-slate-500">{sortBy.includes('version') ? 'V-DL' : 'DL'}</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <Heart />
+                                                                <div className="font-semibold text-slate-900">{formatNumber(sortBy.includes('version') ? model.versionRating : model.thumbs)}</div>
+                                                                <div className="text-slate-500">{sortBy.includes('version') ? 'V-👍👎' : '👍👎'}</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <MessageSquare />
+                                                                <div className="font-semibold text-slate-900">{formatNumber(model.commentCount)}</div>
+                                                                <div className="text-slate-500">Com</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <Zap />
+                                                                <div className="font-semibold text-slate-900">{formatNumber(model.buzz)}</div>
+                                                                <div className="text-slate-500">Buzz</div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
+                                                            <span className="text-xs text-slate-500">{formatDate(model.createdAt)}</span>
+                                                            <ExternalLink />
+                                                        </div>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<CivitaiSearch />, document.getElementById('root'));
+    </script>
+
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>
