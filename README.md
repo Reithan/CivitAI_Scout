@@ -2,6 +2,8 @@
 # CivitAI Scout
 Search and sort Civit.ai models by multiple metrics.
 
+<img width="2349" height="1551" alt="image" src="https://github.com/user-attachments/assets/cd086cac-c18c-4dd8-afd8-57caf9cac232" />
+
 ## What it does
 - Search the latest models by time period, type, and base model
 - Sort only these latest models by downloads, ratings, comments, buzz (tips), or a composite score
