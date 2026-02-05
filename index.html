@@ -282,7 +282,7 @@
                             for (let version of model.modelVersions) {
                                 if (version.images && version.images.length > 0) {
                                     thumbnail = version.images[0].url;
-                                    thumbnail_nsfw = version.images[0].nsfwLevel >= 8;
+                                    thumbnail_nsfw = version.images[0].nsfwLevel >= 5;
                                     selectedVersion = version;
                                     break;
                                 }
