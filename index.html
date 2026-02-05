@@ -188,6 +188,8 @@
             const [availableTypes, setAvailableTypes] = useState(defaultTypes);
             const [availableBaseModels, setAvailableBaseModels] = useState(defaultBaseModels);
             const [blurNSFW, setBlurNSFW] = useState(true);
+            const [imageIndices, setImageIndices] = useState({});
+            const [loadingNSFW, setLoadingNSFW] = useState({});
 
             const sortResults = (rawResults, sortMethod) => {
                 if (!(rawResults?.length > 0)) return rawResults;
@@ -311,7 +313,8 @@
                                 baseModel: selectedVersion.baseModel || 'Unknown',
                                 url: `https://civitai.com/models/${model.id}`,
                                 thumbnail: thumbnail,
-                                nsfw: thumbnail_nsfw || false
+                                nsfw: thumbnail_nsfw || false,
+                                images: selectedVersion.images || []
                             });
 
                             // Mark this model as seen
@@ -333,6 +336,65 @@
                     setLoading(false);
                 }
             }, [period, modelTypes, baseModels, sortBy]);
+
+            // Gallery state helpers
+            const getCurrentIndex = (modelId) => imageIndices[modelId] || 0;
+
+            const setImageIndex = (modelId, index, isDestinationNSFW, isCurrentNSFW) => {
+                // Pre-apply blur if EITHER current OR destination is NSFW
+                // This ensures blur is on during the transition
+                const shouldBlur = isDestinationNSFW || isCurrentNSFW;
+                setLoadingNSFW(prev => ({ ...prev, [modelId]: shouldBlur }));
+                setImageIndices(prev => ({ ...prev, [modelId]: index }));
+            };
+
+            const handleImageLoaded = (modelId, isNSFW) => {
+                setLoadingNSFW(prev => ({ ...prev, [modelId]: isNSFW }));
+            };
+
+            // Gallery navigation component
+            const GalleryArrows = ({ currentIndex, maxIndex, onPrev, onNext }) => {
+                if (maxIndex <= 0) return null; // Hide if only 1 image
+
+                return (
+                    <>
+                        {/* Left Arrow */}
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onPrev();
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 z-10 transition-colors"
+                            aria-label="Previous image"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+
+                        {/* Right Arrow */}
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onNext();
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 z-10 transition-colors"
+                            aria-label="Next image"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+
+                        {/* Counter Label */}
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-1 rounded z-10">
+                            {currentIndex + 1} / {maxIndex + 1}
+                        </div>
+                    </>
+                );
+            };
 
             const formatDate = (dateString) => {
                 return new Date(dateString).toLocaleDateString('en-US', {
@@ -507,34 +569,81 @@
                                                     >
                                                         {/* Thumbnail */}
                                                         <div className="relative aspect-square bg-slate-100 overflow-hidden">
-                                                            {model.thumbnail ? (
-                                                                isVideoUrl(model.thumbnail) ? (
-                                                                    <video
-                                                                        src={model.thumbnail}
-                                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                                                        autoPlay
-                                                                        muted
-                                                                        loop
-                                                                        style={{
-                                                                            filter: blurNSFW && model.nsfw ? 'blur(20px)' : 'none'
-                                                                        }}
-                                                                    />
-                                                                ) : (
-                                                                    <img
-                                                                        src={model.thumbnail}
-                                                                        alt={model.name}
-                                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                                                        style={{
-                                                                            filter: blurNSFW && model.nsfw ? 'blur(20px)' : 'none'
-                                                                        }}
-                                                                    />
-                                                                )
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                                                    <div className="text-center text-sm">No image</div>
-                                                                </div>
-                                                            )}
-                                                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                                            {(() => {
+                                                                const images = model.images || [];
+                                                                const currentIdx = getCurrentIndex(model.id);
+                                                                const currentImage = images[currentIdx];
+
+                                                                if (!currentImage) {
+                                                                    return (
+                                                                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                                            <div className="text-center text-sm">No image</div>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                const imageUrl = currentImage.url;
+                                                                const isNSFW = currentImage.nsfwLevel >= 5;
+                                                                const isVideo = isVideoUrl(imageUrl);
+                                                                // Apply blur if EITHER: pre-applied state (during transition) OR current image is NSFW
+                                                                const appliedNSFW = loadingNSFW[model.id] || isNSFW;
+
+                                                                return (
+                                                                    <>
+                                                                        {isVideo ? (
+                                                                            <video
+                                                                                key={`${model.id}-${currentIdx}`}
+                                                                                src={imageUrl}
+                                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                                autoPlay
+                                                                                muted
+                                                                                loop
+                                                                                onCanPlay={() => handleImageLoaded(model.id, isNSFW)}
+                                                                                style={{
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none'
+                                                                                }}
+                                                                            />
+                                                                        ) : (
+                                                                            <img
+                                                                                src={imageUrl}
+                                                                                alt={`${model.name} - Image ${currentIdx + 1}`}
+                                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                                onLoad={() => handleImageLoaded(model.id, isNSFW)}
+                                                                                style={{
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none'
+                                                                                }}
+                                                                            />
+                                                                        )}
+
+                                                                        {/* Gallery Navigation */}
+                                                                        <GalleryArrows
+                                                                            currentIndex={currentIdx}
+                                                                            maxIndex={images.length - 1}
+                                                                            onPrev={() => {
+                                                                                const nextIdx = currentIdx > 0 ? currentIdx - 1 : images.length - 1;
+                                                                                const nextImage = images[nextIdx];
+                                                                                setImageIndex(
+                                                                                    model.id,
+                                                                                    nextIdx,
+                                                                                    nextImage?.nsfwLevel >= 5,
+                                                                                    isNSFW
+                                                                                );
+                                                                            }}
+                                                                            onNext={() => {
+                                                                                const nextIdx = currentIdx < images.length - 1 ? currentIdx + 1 : 0;
+                                                                                const nextImage = images[nextIdx];
+                                                                                setImageIndex(
+                                                                                    model.id,
+                                                                                    nextIdx,
+                                                                                    nextImage?.nsfwLevel >= 5,
+                                                                                    isNSFW
+                                                                                );
+                                                                            }}
+                                                                        />
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded z-10">
                                                                 {model.type}
                                                             </div>
                                                         </div>
