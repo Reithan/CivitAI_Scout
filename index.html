@@ -189,6 +189,7 @@
             const [availableBaseModels, setAvailableBaseModels] = useState(defaultBaseModels);
             const [blurNSFW, setBlurNSFW] = useState(true);
             const [imageIndices, setImageIndices] = useState({});
+            const [loadedNSFW, setLoadedNSFW] = useState({});
 
             const sortResults = (rawResults, sortMethod) => {
                 if (!(rawResults?.length > 0)) return rawResults;
@@ -341,6 +342,10 @@
 
             const setImageIndex = (modelId, index) => {
                 setImageIndices(prev => ({ ...prev, [modelId]: index }));
+            };
+
+            const handleImageLoaded = (modelId, isNSFW) => {
+                setLoadedNSFW(prev => ({ ...prev, [modelId]: isNSFW }));
             };
 
             // Gallery navigation component
@@ -576,6 +581,8 @@
                                                                 const imageUrl = currentImage.url;
                                                                 const isNSFW = currentImage.nsfwLevel >= 5;
                                                                 const isVideo = isVideoUrl(imageUrl);
+                                                                // Use loadedNSFW state if available, otherwise use current isNSFW (keeps blur during load)
+                                                                const appliedNSFW = loadedNSFW[model.id] !== undefined ? loadedNSFW[model.id] : isNSFW;
 
                                                                 return (
                                                                     <>
@@ -587,8 +594,10 @@
                                                                                 autoPlay
                                                                                 muted
                                                                                 loop
+                                                                                onCanPlay={() => handleImageLoaded(model.id, isNSFW)}
                                                                                 style={{
-                                                                                    filter: blurNSFW && isNSFW ? 'blur(20px)' : 'none'
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none',
+                                                                                    transition: 'filter 0.3s ease-in-out'
                                                                                 }}
                                                                             />
                                                                         ) : (
@@ -596,8 +605,10 @@
                                                                                 src={imageUrl}
                                                                                 alt={`${model.name} - Image ${currentIdx + 1}`}
                                                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                                                onLoad={() => handleImageLoaded(model.id, isNSFW)}
                                                                                 style={{
-                                                                                    filter: blurNSFW && isNSFW ? 'blur(20px)' : 'none'
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none',
+                                                                                    transition: 'filter 0.3s ease-in-out'
                                                                                 }}
                                                                             />
                                                                         )}
