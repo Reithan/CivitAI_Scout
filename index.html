@@ -38,6 +38,8 @@
         const Loader = () => <svg className="inline animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="4.22" y1="4.22" x2="7.34" y2="7.34" /><line x1="16.66" y1="16.66" x2="19.78" y2="19.78" /><line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" /><line x1="4.22" y1="19.78" x2="7.34" y2="16.66" /><line x1="16.66" y1="7.34" x2="19.78" y2="4.22" /></svg>;
         const ExternalLink = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>;
         const Zap = () => <svg className="inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#f97316' }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>;
+        const Sun = () => <svg className="inline" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>;
+        const Moon = () => <svg className="inline" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>;
 
         // Helper functions
         const isVideoUrl = (url) => {
@@ -93,7 +95,7 @@
         };
 
         // Multi-select dropdown component (moved outside of CivitaiSearch to maintain state)
-        const MultiSelect = ({ options, selected, onChange, placeholder, displayNames }) => {
+        const MultiSelect = ({ options, selected, onChange, placeholder, displayNames, darkMode }) => {
             const [open, setOpen] = useState(false);
             const dropdownRef = React.useRef(null);
 
@@ -115,16 +117,16 @@
                 <div className="relative" ref={dropdownRef}>
                     <button
                         onClick={() => setOpen(!open)}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={darkMode ? "w-full px-3 py-2 text-sm border border-slate-600 rounded-md bg-slate-700 text-white text-left focus:outline-none focus:ring-2 focus:ring-blue-400" : "w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500"}
                     >
                         {selected.length === 0 ? placeholder : `${selected.length} selected`}
                     </button>
                     {open && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                        <div className={darkMode ? "absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto" : "absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto"}>
                             {options.map(opt => (
                                 <label
                                     key={opt}
-                                    className="flex items-center px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                    className={darkMode ? "flex items-center px-3 py-2 hover:bg-slate-600 cursor-pointer text-sm text-white" : "flex items-center px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                     }}
@@ -190,6 +192,10 @@
             const [blurNSFW, setBlurNSFW] = useState(true);
             const [imageIndices, setImageIndices] = useState({});
             const [loadingNSFW, setLoadingNSFW] = useState({});
+            const [darkMode, setDarkMode] = useState(() => {
+                const saved = localStorage.getItem('civitai-scout-dark-mode');
+                return saved ? JSON.parse(saved) : false;
+            });
 
             const sortResults = (rawResults, sortMethod) => {
                 if (!(rawResults?.length > 0)) return rawResults;
@@ -224,6 +230,10 @@
                 setResults(sortResults(results, sortBy));
 
             }, [sortBy]);
+
+            useEffect(() => {
+                localStorage.setItem('civitai-scout-dark-mode', JSON.stringify(darkMode));
+            }, [darkMode]);
 
             const fetchCheckpoints = useCallback(async () => {
                 setLoading(true);
@@ -415,28 +425,37 @@
             };
 
             return (
-                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+                <div className={darkMode ? "min-h-screen bg-gradient-to-br from-slate-900 to-slate-950" : "min-h-screen bg-gradient-to-br from-slate-50 to-slate-100"}>
                     {/* Sticky Header & Controls */}
-                    <div className="sticky top-0 z-50 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 shadow-sm">
+                    <div className={darkMode ? "sticky top-0 z-50 bg-gradient-to-b from-slate-900 to-slate-800 border-b border-slate-700 shadow-sm" : "sticky top-0 z-50 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 shadow-sm"}>
                         <div className="max-w-7xl mx-auto p-6">
                             {/* Header */}
-                            <div className="mb-6">
-                                <h1 className="text-4xl font-bold text-slate-900 mb-2">CivitAI Scout</h1>
-                                <p className="text-slate-600">Discover models released recently, sorted by engagement</p>
+                            <div className="mb-6 flex items-center justify-between">
+                                <div>
+                                    <h1 className={darkMode ? "text-4xl font-bold text-white mb-2" : "text-4xl font-bold text-slate-900 mb-2"}>CivitAI Scout</h1>
+                                    <p className={darkMode ? "text-slate-300" : "text-slate-600"}>Discover models released recently, sorted by engagement</p>
+                                </div>
+                                <button
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className={darkMode ? "p-2 rounded-lg border border-slate-600 bg-slate-700 hover:bg-slate-600 transition-colors" : "p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors"}
+                                    aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+                                >
+                                    {darkMode ? <Sun /> : <Moon />}
+                                </button>
                             </div>
 
                             {/* Controls */}
-                            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                            <div className={darkMode ? "bg-slate-800 rounded-lg shadow-sm border border-slate-700 p-6" : "bg-white rounded-lg shadow-sm border border-slate-200 p-6"}>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                                     {/* Period Filter */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className={darkMode ? "block text-sm font-medium text-slate-200 mb-2" : "block text-sm font-medium text-slate-700 mb-2"}>
                                             <Calendar /> Time Period
                                         </label>
                                         <select
                                             value={period}
                                             onChange={(e) => setPeriod(e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                            className={darkMode ? "w-full px-3 py-2 text-sm border border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-700 text-white" : "w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"}
                                         >
                                             <option value="Day">Past Day</option>
                                             <option value="Week">Past Week</option>
@@ -448,7 +467,7 @@
 
                                     {/* Model Type Filter */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+                                        <label className={darkMode ? "block text-sm font-medium text-slate-200 mb-2" : "block text-sm font-medium text-slate-700 mb-2"}>Type</label>
                                         <MultiSelect
                                             key="model-types"
                                             options={availableTypes}
@@ -456,30 +475,32 @@
                                             onChange={setModelTypes}
                                             placeholder="All Types"
                                             displayNames={typeDisplayNames}
+                                            darkMode={darkMode}
                                         />
                                     </div>
 
                                     {/* Base Model Filter */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Base Model</label>
+                                        <label className={darkMode ? "block text-sm font-medium text-slate-200 mb-2" : "block text-sm font-medium text-slate-700 mb-2"}>Base Model</label>
                                         <MultiSelect
                                             key="base-models"
                                             options={availableBaseModels}
                                             selected={baseModels}
                                             onChange={setBaseModels}
                                             placeholder="All Models"
+                                            darkMode={darkMode}
                                         />
                                     </div>
 
                                     {/* Sort Filter */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className={darkMode ? "block text-sm font-medium text-slate-200 mb-2" : "block text-sm font-medium text-slate-700 mb-2"}>
                                             <Download /> Sort By
                                         </label>
                                         <select
                                             value={sortBy}
                                             onChange={(e) => setSortBy(e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                            className={darkMode ? "w-full px-3 py-2 text-sm border border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-700 text-white" : "w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"}
                                         >
                                             <option value="score">Composite Score</option>
                                             <option value="version-downloads">Version Downloads</option>
@@ -494,14 +515,14 @@
 
                                     {/* NSFW Blur Toggle */}
                                     <div className="flex items-end">
-                                        <label className="flex items-center gap-2 cursor-pointer h-10 px-3 py-2 text-sm border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors">
+                                        <label className={darkMode ? "flex items-center gap-2 cursor-pointer h-10 px-3 py-2 text-sm border border-slate-600 rounded-md bg-slate-700 hover:bg-slate-600 transition-colors" : "flex items-center gap-2 cursor-pointer h-10 px-3 py-2 text-sm border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors"}>
                                             <input
                                                 type="checkbox"
                                                 checked={blurNSFW}
                                                 onChange={(e) => setBlurNSFW(e.target.checked)}
                                                 className="w-4 h-4"
                                             />
-                                            <span className="font-medium text-slate-700">Blur NSFW</span>
+                                            <span className={darkMode ? "font-medium text-slate-200" : "font-medium text-slate-700"}>Blur NSFW</span>
                                         </label>
                                     </div>
 
@@ -510,7 +531,7 @@
                                         <button
                                             onClick={fetchCheckpoints}
                                             disabled={loading}
-                                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium text-sm rounded-md transition-colors flex items-center justify-center gap-2"
+                                            className={darkMode ? "w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-medium text-sm rounded-md transition-colors flex items-center justify-center gap-2" : "w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium text-sm rounded-md transition-colors flex items-center justify-center gap-2"}
                                         >
                                             {loading ? (
                                                 <>
@@ -528,7 +549,7 @@
                                 </div>
 
                                 {error && (
-                                    <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                                    <div className={darkMode ? "p-4 bg-red-900/20 border border-red-800 rounded-md text-red-300 text-sm" : "p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm"}>
                                         {error}
                                     </div>
                                 )}
@@ -543,19 +564,19 @@
                             {searched && (
                                 <div>
                                     {loading ? (
-                                        <div className="p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200">
+                                        <div className={darkMode ? "p-12 text-center text-slate-300 bg-slate-800 rounded-lg shadow-sm border border-slate-700" : "p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200"}>
                                             <div className="flex justify-center mb-4">
                                                 <Loader />
                                             </div>
                                             Loading models...
                                         </div>
                                     ) : results.length === 0 ? (
-                                        <div className="p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200">
+                                        <div className={darkMode ? "p-12 text-center text-slate-300 bg-slate-800 rounded-lg shadow-sm border border-slate-700" : "p-12 text-center text-slate-600 bg-white rounded-lg shadow-sm border border-slate-200"}>
                                             No models found for this time period.
                                         </div>
                                     ) : (
                                         <div>
-                                            <div className="text-sm text-slate-600 mb-4">
+                                            <div className={darkMode ? "text-sm text-slate-300 mb-4" : "text-sm text-slate-600 mb-4"}>
                                                 Found {results.length} result{results.length !== 1 ? 's' : ''}
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -565,10 +586,10 @@
                                                         href={model.url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200"
+                                                        className={darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-600 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200"}
                                                     >
                                                         {/* Thumbnail */}
-                                                        <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                                                        <div className={darkMode ? "relative aspect-square bg-slate-900 overflow-hidden" : "relative aspect-square bg-slate-100 overflow-hidden"}>
                                                             {(() => {
                                                                 const images = model.images || [];
                                                                 const currentIdx = getCurrentIndex(model.id);
@@ -650,19 +671,19 @@
 
                                                         {/* Content */}
                                                         <div className="p-4">
-                                                            <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-1 group-hover:text-blue-600">
+                                                            <h3 className={darkMode ? "font-semibold text-white text-sm line-clamp-2 mb-1 group-hover:text-blue-400" : "font-semibold text-slate-900 text-sm line-clamp-2 mb-1 group-hover:text-blue-600"}>
                                                                 {model.name}
                                                             </h3>
 
-                                                            <p className="text-xs text-slate-500 mb-3">{model.creator}</p>
+                                                            <p className={darkMode ? "text-xs text-slate-400 mb-3" : "text-xs text-slate-500 mb-3"}>{model.creator}</p>
 
-                                                            <p className="text-xs text-slate-600 line-clamp-2 mb-3">
+                                                            <p className={darkMode ? "text-xs text-slate-300 line-clamp-2 mb-3" : "text-xs text-slate-600 line-clamp-2 mb-3"}>
                                                                 {stripHtml(model.description)}
                                                             </p>
 
                                                             {/* Base Model Badge */}
                                                             <div className="mb-3">
-                                                                <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded">
+                                                                <span className={darkMode ? "inline-block bg-blue-900/30 text-blue-300 text-xs px-2 py-1 rounded" : "inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded"}>
                                                                     {model.baseModel}
                                                                 </span>
                                                             </div>
@@ -671,28 +692,28 @@
                                                             <div className="grid grid-cols-4 gap-2 text-xs">
                                                                 <div className="text-center">
                                                                     <Download />
-                                                                    <div className="font-semibold text-slate-900">{formatNumber(sortBy.includes('version') ? model.versionDownloadCount : model.downloadCount)}</div>
-                                                                    <div className="text-slate-500">{sortBy.includes('version') ? 'V-DL' : 'DL'}</div>
+                                                                    <div className={darkMode ? "font-semibold text-white" : "font-semibold text-slate-900"}>{formatNumber(sortBy.includes('version') ? model.versionDownloadCount : model.downloadCount)}</div>
+                                                                    <div className={darkMode ? "text-slate-400" : "text-slate-500"}>{sortBy.includes('version') ? 'V-DL' : 'DL'}</div>
                                                                 </div>
                                                                 <div className="text-center">
                                                                     <Heart />
-                                                                    <div className="font-semibold text-slate-900">{formatNumber(sortBy.includes('version') ? model.versionRating : model.thumbs)}</div>
-                                                                    <div className="text-slate-500">{sortBy.includes('version') ? 'V-👍👎' : '👍👎'}</div>
+                                                                    <div className={darkMode ? "font-semibold text-white" : "font-semibold text-slate-900"}>{formatNumber(sortBy.includes('version') ? model.versionRating : model.thumbs)}</div>
+                                                                    <div className={darkMode ? "text-slate-400" : "text-slate-500"}>{sortBy.includes('version') ? 'V-👍👎' : '👍👎'}</div>
                                                                 </div>
                                                                 <div className="text-center">
                                                                     <MessageSquare />
-                                                                    <div className="font-semibold text-slate-900">{formatNumber(model.commentCount)}</div>
-                                                                    <div className="text-slate-500">Com</div>
+                                                                    <div className={darkMode ? "font-semibold text-white" : "font-semibold text-slate-900"}>{formatNumber(model.commentCount)}</div>
+                                                                    <div className={darkMode ? "text-slate-400" : "text-slate-500"}>Com</div>
                                                                 </div>
                                                                 <div className="text-center">
                                                                     <Zap />
-                                                                    <div className="font-semibold text-slate-900">{formatNumber(model.buzz)}</div>
-                                                                    <div className="text-slate-500">Buzz</div>
+                                                                    <div className={darkMode ? "font-semibold text-white" : "font-semibold text-slate-900"}>{formatNumber(model.buzz)}</div>
+                                                                    <div className={darkMode ? "text-slate-400" : "text-slate-500"}>Buzz</div>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                                                                <span className="text-xs text-slate-500">{formatDate(model.createdAt)}</span>
+                                                            <div className={darkMode ? "mt-3 pt-3 border-t border-slate-700 flex items-center justify-between" : "mt-3 pt-3 border-t border-slate-200 flex items-center justify-between"}>
+                                                                <span className={darkMode ? "text-xs text-slate-400" : "text-xs text-slate-500"}>{formatDate(model.createdAt)}</span>
                                                                 <ExternalLink />
                                                             </div>
                                                         </div>
