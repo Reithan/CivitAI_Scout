@@ -189,7 +189,7 @@
             const [availableBaseModels, setAvailableBaseModels] = useState(defaultBaseModels);
             const [blurNSFW, setBlurNSFW] = useState(true);
             const [imageIndices, setImageIndices] = useState({});
-            const [loadedNSFW, setLoadedNSFW] = useState({});
+            const [loadingNSFW, setLoadingNSFW] = useState({});
 
             const sortResults = (rawResults, sortMethod) => {
                 if (!(rawResults?.length > 0)) return rawResults;
@@ -340,12 +340,16 @@
             // Gallery state helpers
             const getCurrentIndex = (modelId) => imageIndices[modelId] || 0;
 
-            const setImageIndex = (modelId, index) => {
+            const setImageIndex = (modelId, index, isDestinationNSFW, isCurrentNSFW) => {
+                // Pre-apply blur if EITHER current OR destination is NSFW
+                // This ensures blur is on during the transition
+                const shouldBlur = isDestinationNSFW || isCurrentNSFW;
+                setLoadingNSFW(prev => ({ ...prev, [modelId]: shouldBlur }));
                 setImageIndices(prev => ({ ...prev, [modelId]: index }));
             };
 
             const handleImageLoaded = (modelId, isNSFW) => {
-                setLoadedNSFW(prev => ({ ...prev, [modelId]: isNSFW }));
+                setLoadingNSFW(prev => ({ ...prev, [modelId]: isNSFW }));
             };
 
             // Gallery navigation component
@@ -581,8 +585,8 @@
                                                                 const imageUrl = currentImage.url;
                                                                 const isNSFW = currentImage.nsfwLevel >= 5;
                                                                 const isVideo = isVideoUrl(imageUrl);
-                                                                // Use loadedNSFW state if available, otherwise use current isNSFW (keeps blur during load)
-                                                                const appliedNSFW = loadedNSFW[model.id] !== undefined ? loadedNSFW[model.id] : isNSFW;
+                                                                // Apply blur if EITHER: pre-applied state (during transition) OR current image is NSFW
+                                                                const appliedNSFW = loadingNSFW[model.id] || isNSFW;
 
                                                                 return (
                                                                     <>
@@ -596,8 +600,7 @@
                                                                                 loop
                                                                                 onCanPlay={() => handleImageLoaded(model.id, isNSFW)}
                                                                                 style={{
-                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none',
-                                                                                    transition: 'filter 0.3s ease-in-out'
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none'
                                                                                 }}
                                                                             />
                                                                         ) : (
@@ -607,8 +610,7 @@
                                                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                                                                 onLoad={() => handleImageLoaded(model.id, isNSFW)}
                                                                                 style={{
-                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none',
-                                                                                    transition: 'filter 0.3s ease-in-out'
+                                                                                    filter: blurNSFW && appliedNSFW ? 'blur(20px)' : 'none'
                                                                                 }}
                                                                             />
                                                                         )}
@@ -617,14 +619,26 @@
                                                                         <GalleryArrows
                                                                             currentIndex={currentIdx}
                                                                             maxIndex={images.length - 1}
-                                                                            onPrev={() => setImageIndex(
-                                                                                model.id,
-                                                                                currentIdx > 0 ? currentIdx - 1 : images.length - 1
-                                                                            )}
-                                                                            onNext={() => setImageIndex(
-                                                                                model.id,
-                                                                                currentIdx < images.length - 1 ? currentIdx + 1 : 0
-                                                                            )}
+                                                                            onPrev={() => {
+                                                                                const nextIdx = currentIdx > 0 ? currentIdx - 1 : images.length - 1;
+                                                                                const nextImage = images[nextIdx];
+                                                                                setImageIndex(
+                                                                                    model.id,
+                                                                                    nextIdx,
+                                                                                    nextImage?.nsfwLevel >= 5,
+                                                                                    isNSFW
+                                                                                );
+                                                                            }}
+                                                                            onNext={() => {
+                                                                                const nextIdx = currentIdx < images.length - 1 ? currentIdx + 1 : 0;
+                                                                                const nextImage = images[nextIdx];
+                                                                                setImageIndex(
+                                                                                    model.id,
+                                                                                    nextIdx,
+                                                                                    nextImage?.nsfwLevel >= 5,
+                                                                                    isNSFW
+                                                                                );
+                                                                            }}
                                                                         />
                                                                     </>
                                                                 );
