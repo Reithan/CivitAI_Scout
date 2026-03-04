@@ -286,18 +286,22 @@
                         typeSet.add(model.type);
 
                         if (model.modelVersions && model.modelVersions.length > 0) {
-                            // Find first version with images for thumbnail
+                            // Sort versions by publishedAt date in descending order (most recent first)
+                            const sortedVersions = [...model.modelVersions].sort((a, b) => {
+                                const dateA = new Date(a.publishedAt).getTime();
+                                const dateB = new Date(b.publishedAt).getTime();
+                                return dateB - dateA;  // Descending order (most recent first)
+                            });
+
+                            // Select the most recent version
                             let thumbnail = null;
                             let thumbnail_nsfw = false;
-                            let selectedVersion = model.modelVersions[0];
+                            let selectedVersion = sortedVersions[0];
 
-                            for (let version of model.modelVersions) {
-                                if (version.images && version.images.length > 0) {
-                                    thumbnail = version.images[0].url;
-                                    thumbnail_nsfw = version.images[0].nsfwLevel >= 5;
-                                    selectedVersion = version;
-                                    break;
-                                }
+                            // Extract thumbnail from the most recent version if images exist
+                            if (selectedVersion.images && selectedVersion.images.length > 0) {
+                                thumbnail = selectedVersion.images[0].url;
+                                thumbnail_nsfw = selectedVersion.images[0].nsfwLevel >= 5;
                             }
 
                             if (selectedVersion.baseModel) baseModelSet.add(selectedVersion.baseModel);
