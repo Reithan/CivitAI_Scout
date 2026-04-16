@@ -302,7 +302,8 @@
                             }
 
                             const hasNsfwImage = selectedVersion.images?.some(img => img.nsfwLevel >= 4) || false;
-                            const nsfw = model.nsfw || hasNsfwImage;
+                            const hasNsfwLevel = model.nsfwLevel > 3 || (selectedVersion.nsfwLevel || 0) > 3;
+                            const nsfw = hasNsfwLevel || hasNsfwImage;
 
                             if (selectedVersion.baseModel) baseModelSet.add(selectedVersion.baseModel);
 
