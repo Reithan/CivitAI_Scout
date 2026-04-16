@@ -1,6 +1,6 @@
 [![pages-build-deployment](https://github.com/Reithan/CivitAI_Scout/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/Reithan/CivitAI_Scout/actions/workflows/pages/pages-build-deployment)
 # CivitAI Scout
-Search and sort Civit.ai models by multiple metrics.
+Search and sort Civit.ai models by multiple metrics. **UPDATE 2026-04-16:** Now supports `Civitai.red`.
 
 <img width="2349" height="1551" alt="image" src="https://github.com/user-attachments/assets/cd086cac-c18c-4dd8-afd8-57caf9cac232" />
 
