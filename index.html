@@ -301,7 +301,7 @@
                             // Extract thumbnail from the most recent version if images exist
                             if (selectedVersion.images && selectedVersion.images.length > 0) {
                                 thumbnail = selectedVersion.images[0].url;
-                                thumbnail_nsfw = selectedVersion.images[0].nsfwLevel >= 5;
+                                thumbnail_nsfw = selectedVersion.images.some(img => img.nsfwLevel >= 4);
                             }
 
                             if (selectedVersion.baseModel) baseModelSet.add(selectedVersion.baseModel);
@@ -593,7 +593,7 @@
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className={model.nsfw
-                                            ? (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-red-600 overflow-hidden hover:shadow-md hover:border-red-400 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-red-400 overflow-hidden hover:shadow-md hover:border-red-600 transition-all duration-200")
+                                            ? (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border-2 border-red-600 overflow-hidden hover:shadow-md hover:border-red-400 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border-2 border-red-400 overflow-hidden hover:shadow-md hover:border-red-600 transition-all duration-200")
                                             : (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-600 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200")}
                                                     >
                                                         {/* Thumbnail */}
