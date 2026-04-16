@@ -259,7 +259,7 @@
                     }
 
                     const response = await fetch(
-                        `https://civitai.com/api/v1/models?${params}`
+                        `https://civitai.red/api/v1/models?${params}`
                     );
 
                     if (!response.ok) throw new Error('API request failed');
@@ -325,7 +325,9 @@
                                 type: model.type,
                                 createdAt: selectedVersion.publishedAt || model.createdAt,
                                 baseModel: selectedVersion.baseModel || 'Unknown',
-                                url: `https://civitai.com/models/${model.id}`,
+                                url: thumbnail_nsfw
+                                    ? `https://civitai.red/models/${model.id}`
+                                    : `https://civitai.com/models/${model.id}`,
                                 thumbnail: thumbnail,
                                 nsfw: thumbnail_nsfw || false,
                                 images: selectedVersion.images || []
@@ -590,7 +592,9 @@
                                                         href={model.url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className={darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-600 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200"}
+                                                        className={model.nsfw
+                                            ? (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-red-600 overflow-hidden hover:shadow-md hover:border-red-400 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-red-400 overflow-hidden hover:shadow-md hover:border-red-600 transition-all duration-200")
+                                            : (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-600 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200")}
                                                     >
                                                         {/* Thumbnail */}
                                                         <div className={darkMode ? "relative aspect-square bg-slate-900 overflow-hidden" : "relative aspect-square bg-slate-100 overflow-hidden"}>
