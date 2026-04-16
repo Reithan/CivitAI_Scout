@@ -308,7 +308,7 @@
                                 thumbnail = selectedVersion.images[0].url;
                             }
 
-                            const hasNsfwImage = selectedVersion.images?.some(img => img.nsfwLevel >= 4) || false;
+                            const hasNsfwImage = selectedVersion.images?.some(img => img.nsfwLevel > 3) || false;
                             const hasNsfwLevel = model.nsfwLevel > 3 || (selectedVersion.nsfwLevel || 0) > 3;
                             const nsfw = hasNsfwLevel || hasNsfwImage;
 
