@@ -295,16 +295,14 @@
 
                             // Select the most recent version
                             let thumbnail = null;
-                            let thumbnail_nsfw = false;
-                            let nsfw_model = false;
                             let selectedVersion = sortedVersions[0];
 
-                            // Extract thumbnail from the most recent version if images exist
                             if (selectedVersion.images && selectedVersion.images.length > 0) {
                                 thumbnail = selectedVersion.images[0].url;
-                                thumbnail_nsfw = selectedVersion.images[0].nsfwLevel >= 5;
-                                nsfw_model = selectedVersion.images.some(img => img.nsfwLevel >= 4);
                             }
+
+                            const hasNsfwImage = selectedVersion.images?.some(img => img.nsfwLevel >= 4) || false;
+                            const nsfw = model.nsfw || hasNsfwImage;
 
                             if (selectedVersion.baseModel) baseModelSet.add(selectedVersion.baseModel);
 
@@ -327,12 +325,11 @@
                                 type: model.type,
                                 createdAt: selectedVersion.publishedAt || model.createdAt,
                                 baseModel: selectedVersion.baseModel || 'Unknown',
-                                url: nsfw_model
+                                url: nsfw
                                     ? `https://civitai.red/models/${model.id}`
                                     : `https://civitai.com/models/${model.id}`,
                                 thumbnail: thumbnail,
-                                thumbnail_nsfw: thumbnail_nsfw,
-                                nsfw_model: nsfw_model,
+                                nsfw: nsfw,
                                 images: selectedVersion.images || []
                             });
 
@@ -595,7 +592,7 @@
                                                         href={model.url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className={model.nsfw_model
+                                                        className={model.nsfw
                                             ? (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border-2 border-red-600 overflow-hidden hover:shadow-md hover:border-red-400 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border-2 border-red-400 overflow-hidden hover:shadow-md hover:border-red-600 transition-all duration-200")
                                             : (darkMode ? "group bg-slate-800 rounded-lg shadow-sm border border-slate-700 overflow-hidden hover:shadow-md hover:border-blue-600 transition-all duration-200" : "group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-300 transition-all duration-200")}
                                                     >
