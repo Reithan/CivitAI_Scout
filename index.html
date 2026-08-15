@@ -76,7 +76,13 @@
 
             // Weight thumbs LESS as downloads increase (inverse)
             const thumbsWeight = Math.min(1, 100 / downloadCount);  // Caps at 1, decreases with downloads
-            const thumbsSignal = netThumbs * thumbsWeight;
+
+            // Damp thumbs for low-download models (feed upvotes don't require downloads,
+            // so tiny models can have more upvotes than downloads)
+            const sampleConfidence = Math.min(1, downloads / 25);
+
+            // Log-compress so thumbs stay commensurate with the other log-scaled signals
+            const thumbsSignal = Math.log10(netThumbs * thumbsWeight * sampleConfidence + 1) * 3;
 
             return dlSignal + thumbsSignal + tipsSignal;
         };
