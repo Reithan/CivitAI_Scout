@@ -1,0 +1,110 @@
+name: Deploy Pages & refresh enums
+
+# Freshens enums.json (the filter-dropdown source) from CivitAI's /api/v1/enums —
+# which is not CORS-enabled for direct browser use, so we fetch it server-side here —
+# then deploys the site to GitHub Pages.
+#
+# Triggers:
+#   - push to main / manual dispatch: refresh enums and deploy (this IS the "on deploy").
+#   - Monday 00:00 UTC: refresh only if no deploy happened in the prior 7 days, and
+#     only redeploy when the enum values actually changed.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1'   # Monday 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit the refreshed enums.json back to the repo
+  pages: write      # publish to GitHub Pages
+  id-token: write   # OIDC token for actions/deploy-pages
+
+# Never run two Pages deploys at once; let an in-flight one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # On the weekly cron only: skip entirely if a deploy (any commit to main)
+      # landed within the last 7 days — the weekly run is a fallback for quiet weeks.
+      - name: Weekly guard
+        id: guard
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            age=$(( $(date -u +%s) - $(git log -1 --format=%ct HEAD) ))
+            if [ "$age" -lt 604800 ]; then
+              echo "Last commit was ${age}s ago (<7d); skipping weekly refresh."
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh enums.json from CivitAI
+        id: refresh
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          curl -fsS --retry 3 https://civitai.com/api/v1/enums -o enums.json.new
+          # Sanity-check the payload before replacing the committed file.
+          jq -e '(.ModelType | length > 0) and (.ActiveBaseModel | length > 0)' enums.json.new > /dev/null
+          mv enums.json.new enums.json
+          if git diff --quiet -- enums.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit refreshed enums.json
+        if: steps.refresh.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add enums.json
+          git commit -m "chore: refresh enums.json from CivitAI /enums"
+          # Don't fail the deploy if the branch is protected against direct pushes;
+          # the fresh enums.json is still deployed from the working tree below.
+          git push || echo "::warning::push blocked (branch protection?); deploying fresh copy without committing"
+
+      # Deploy on push/dispatch always; on the weekly cron only when values changed.
+      - name: Decide whether to deploy
+        id: decide
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "deploy=${{ steps.refresh.outputs.changed }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble site
+        if: steps.decide.outputs.deploy == 'true'
+        run: |
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.gitnexus' \
+            --exclude='.claude' ./ _site/
+
+      - name: Configure Pages
+        if: steps.decide.outputs.deploy == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        if: steps.decide.outputs.deploy == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        if: steps.decide.outputs.deploy == 'true'
+        uses: actions/deploy-pages@v4
