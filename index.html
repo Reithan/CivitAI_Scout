@@ -244,6 +244,31 @@
                 localStorage.setItem('civitai-scout-dark-mode', JSON.stringify(darkMode));
             }, [darkMode]);
 
+            // Freshen the filter dropdowns with live, authoritative values before the
+            // user's first search. We fetch a same-origin enums.json (committed to the repo
+            // and refreshed by CI from CivitAI's /api/v1/enums, which is not CORS-enabled for
+            // direct browser use). On any failure we silently keep the hardcoded seed lists
+            // (defaultTypes / defaultBaseModels), which remain the initial state.
+            useEffect(() => {
+                let cancelled = false;
+                (async () => {
+                    try {
+                        const res = await fetch('./enums.json');
+                        const data = res.ok ? await res.json() : null;
+                        if (cancelled || !data) return;
+                        if (Array.isArray(data.ModelType) && data.ModelType.length > 0) {
+                            setAvailableTypes(data.ModelType);
+                        }
+                        if (Array.isArray(data.ActiveBaseModel) && data.ActiveBaseModel.length > 0) {
+                            setAvailableBaseModels([...data.ActiveBaseModel].sort());
+                        }
+                    } catch (err) {
+                        // Offline or API down: fall back to the hardcoded seed lists.
+                    }
+                })();
+                return () => { cancelled = true; };
+            }, []);
+
             const fetchCheckpoints = useCallback(async () => {
                 setLoading(true);
                 setError('');
