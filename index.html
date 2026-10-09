@@ -60,8 +60,8 @@
             // Signal 1: Downloads (base popularity)
             const dlSignal = Math.log10(downloads + 1);
 
-            // Signal 2: Tips (prestige, high multiplier)
-            const tipsSignal = Math.log10(tips + 1) * 5;  // Linear, not squared; strong multiplier
+            // Signal 2: Tips (prestige, multiplier reduced to balance with other signals)
+            const tipsSignal = Math.log10(tips + 1) * 2;  // Linear; balanced multiplier
 
             // Signal 3: Thumbs (engagement quality, but LESS important at high downloads)
             const downloadCount = Math.max(downloads, 10);
