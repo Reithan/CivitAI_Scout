@@ -57,10 +57,6 @@
 
         // Calculate composite score from multiple signals
         const calculateScore = (thumbsUp, thumbsDown, downloads, tips) => {
-            if (downloads === 0 && thumbsUp === 0) {
-                return Math.pow(Math.log10(tips + 1), 2);
-            }
-
             // Signal 1: Downloads (base popularity)
             const dlSignal = Math.log10(downloads + 1);
 
@@ -72,7 +68,10 @@
             const engagementBaseline = Math.max(0.05, 0.2 / Math.sqrt(downloadCount / 100));
             const expectedThumbs = downloadCount * engagementBaseline;
             const thumbsRatioSignal = thumbsUp - expectedThumbs;
-            const netThumbs = Math.max(thumbsRatioSignal - thumbsDown * 10, 0);
+
+            const totalVotes = thumbsUp + thumbsDown;
+            const approvalRatio = totalVotes > 0 ? thumbsUp / totalVotes : 1;
+            const netThumbs = Math.max(thumbsRatioSignal * approvalRatio, 0);
 
             // Weight thumbs LESS as downloads increase (inverse)
             const thumbsWeight = Math.min(1, 100 / downloadCount);  // Caps at 1, decreases with downloads
